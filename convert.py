@@ -76,9 +76,9 @@ class kn5Node:
         self.type = 1
         self.materialID = -1
 
-        self.translation = np.identity(3)
-        self.rotation = np.identity(3)
-        self.scaling = np.identity(3)
+        self.translation = np.zeros(3)
+        self.rotation = np.zeros(3)
+        self.scaling = np.ones(3)
 
         self.vertexCount = 0
         self.indices = []
@@ -178,32 +178,34 @@ def read_nodes(file, node_list, parent_id):
     new_node.type, = struct.unpack('<i', file.read(4))
     new_node.name = read_string(file, struct.unpack('<i', file.read(4))[0])
     children_count, = struct.unpack('<i', file.read(4))
-    abyte = file.read(1)
+    _abyte = file.read(1)
 
     if new_node.type == 1:  # dummy
-        new_node.tmatrix = [[0] * 4 for _ in range(4)]
+        tmatrix_list = [[0.0] * 4 for _ in range(4)]
         for i in range(4):
             for j in range(4):
-                new_node.tmatrix[i][j], = struct.unpack('<f', file.read(4))
+                tmatrix_list[i][j], = struct.unpack('<f', file.read(4))
+        
+        new_node.tmatrix = np.array(tmatrix_list)
 
-        new_node.translation = [new_node.tmatrix[3][0],
+        new_node.translation = np.array([new_node.tmatrix[3][0],
                                 new_node.tmatrix[3][1],
-                                new_node.tmatrix[3][2]]
+                                new_node.tmatrix[3][2]])
 
-        new_node.rotation = matrix_to_euler(new_node.tmatrix)
-        new_node.scaling = scale_from_matrix(new_node.tmatrix)
+        new_node.rotation = np.array(matrix_to_euler(new_node.tmatrix))
+        new_node.scaling = np.array(scale_from_matrix(new_node.tmatrix))
 
     elif new_node.type == 2:  # mesh
-        bbyte = file.read(1)
-        cbyte = file.read(1)
-        dbyte = file.read(1)
+        _bbyte = file.read(1)
+        _cbyte = file.read(1)
+        _dbyte = file.read(1)
 
         new_node.vertexCount, = struct.unpack('<i', file.read(4))
         new_node.position = []
         new_node.normal = []
         new_node.texture0 = []
 
-        for v in range(new_node.vertexCount):
+        for _v in range(new_node.vertexCount):
             new_node.position.extend(struct.unpack('<fff', file.read(12)))
             new_node.normal.extend(struct.unpack('<fff', file.read(12)))
             tex = struct.unpack('<ff', file.read(8))
@@ -213,20 +215,20 @@ def read_nodes(file, node_list, parent_id):
             file.read(12)
 
         index_count, = struct.unpack('<i', file.read(4))
-        new_node.indices = struct.unpack(
-            '<%dH' % index_count, file.read(index_count * 2))
+        new_node.indices = list(struct.unpack(
+            '<%dH' % index_count, file.read(index_count * 2)))
         new_node.materialID, = struct.unpack('<i', file.read(4))
         # file.seek(29, 1)
         file.read(29)
 
     elif new_node.type == 3:  # animated mesh
-        bbyte = file.read(1)
-        cbyte = file.read(1)
-        dbyte = file.read(1)
+        _bbyte = file.read(1)
+        _cbyte = file.read(1)
+        _dbyte = file.read(1)
 
         bone_count, = struct.unpack('<i', file.read(4))
-        for b in range(bone_count):
-            bone_name = read_string(file, struct.unpack('<i', file.read(4))[0])
+        for _b in range(bone_count):
+            _bone_name = read_string(file, struct.unpack('<i', file.read(4))[0])
             # file.seek(64, 1)  # transformation matrix
             file.read(64)
 
@@ -234,7 +236,7 @@ def read_nodes(file, node_list, parent_id):
         new_node.position = []
         new_node.normal = []
         new_node.texture0 = []
-        for v in range(new_node.vertexCount):
+        for _v in range(new_node.vertexCount):
             new_node.position.extend(struct.unpack('<fff', file.read(12)))
             new_node.normal.extend(struct.unpack('<fff', file.read(12)))
             tex = struct.unpack('<ff', file.read(8))
@@ -244,8 +246,8 @@ def read_nodes(file, node_list, parent_id):
             file.read(44)
 
         index_count, = struct.unpack('<i', file.read(4))
-        new_node.indices = struct.unpack(
-            '<%dH' % index_count, file.read(index_count * 2))
+        new_node.indices = list(struct.unpack(
+            '<%dH' % index_count, file.read(index_count * 2)))
         new_node.materialID, = struct.unpack('<i', file.read(4))
         # file.seek(12, 1)
         file.read(12)
@@ -259,7 +261,7 @@ def read_nodes(file, node_list, parent_id):
     node_list.append(new_node)
     current_id = len(node_list) - 1
 
-    for c in range(children_count):
+    for _c in range(children_count):
         node_list = read_nodes(file, node_list, current_id)
 
     return node_list
@@ -473,15 +475,15 @@ def read_kn5(file_path, output_dir):
     with open(file_path, "rb") as file:
         header = file.read(10)
         # Parse the header data
-        magic, version = struct.unpack("<6s1I", header)
+        _magic, version = struct.unpack("<6s1I", header)
 
         if version > 5:
             _ = file.read(4)
 
         # Extract textures
         tex_count = struct.unpack("<i", file.read(4))[0]
-        for t in range(tex_count):
-            tex_type = struct.unpack("<i", file.read(4))[0]
+        for _t in range(tex_count):
+            _tex_type = struct.unpack("<i", file.read(4))[0]
             tex_name = read_string(file, struct.unpack("<i", file.read(4))[0])
             tex_size = struct.unpack("<i", file.read(4))[0]
             textures.append(tex_name)
@@ -501,19 +503,19 @@ def read_kn5(file_path, output_dir):
         # Extract materials
         mat_count = struct.unpack("<i", file.read(4))[0]
 
-        for m in range(mat_count):
+        for _m in range(mat_count):
             new_material = kn5Material()
 
             new_material.name = read_string(
                 file, struct.unpack("<i", file.read(4))[0])
             new_material.shader = read_string(
                 file, struct.unpack("<i", file.read(4))[0])
-            ashort = struct.unpack("<h", file.read(2))[0]
+            _ashort = struct.unpack("<h", file.read(2))[0]
             if version > 4:
-                azero = struct.unpack("<i", file.read(4))[0]
+                _azero = struct.unpack("<i", file.read(4))[0]
 
             prop_count = struct.unpack("<i", file.read(4))[0]
-            for p in range(prop_count):
+            for _p in range(prop_count):
                 prop_name = read_string(
                     file, struct.unpack("<i", file.read(4))[0])
                 prop_value = struct.unpack("<f", file.read(4))[0]
@@ -547,10 +549,10 @@ def read_kn5(file_path, output_dir):
                 file.seek(36, os.SEEK_CUR)
 
             textures = struct.unpack("<i", file.read(4))[0]
-            for t in range(textures):
+            for _t in range(textures):
                 sample_name = read_string(
                     file, struct.unpack("<i", file.read(4))[0])
-                sample_slot = struct.unpack("<i", file.read(4))[0]
+                _sample_slot = struct.unpack("<i", file.read(4))[0]
                 tex_name = read_string(
                     file, struct.unpack("<i", file.read(4))[0])
 
